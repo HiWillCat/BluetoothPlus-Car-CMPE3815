@@ -1,4 +1,7 @@
 // === FINAL PROJECT - Bluetooth+ Car === //
+// Students: Aria Lindberg, Will Gambero
+// CMPE3815 - Microcontroller Systems
+// ====================================== //
 
 // EXAMPLE 3 - Safety features
   // Run safety features (passive/active) with sensors
