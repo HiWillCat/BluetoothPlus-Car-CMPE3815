@@ -1,4 +1,7 @@
 // === FINAL PROJECT - Bluetooth+ Car === //
+// Students: Aria Lindberg, Will Gambero
+// CMPE3815 - Microcontroller Systems
+// ====================================== //
 
 // EXAMPLE 2 - RemoteXY GUI Test
   // Test reading RemoteXY GUI functions using library and online editor
