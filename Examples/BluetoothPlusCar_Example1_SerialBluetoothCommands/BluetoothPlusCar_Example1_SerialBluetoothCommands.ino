@@ -1,4 +1,7 @@
 // === FINAL PROJECT - Bluetooth+ Car === //
+// Students: Aria Lindberg, Will Gambero
+// CMPE3815 - Microcontroller Systems
+// ====================================== //
 
 // EXAMPLE 1 - Fundamental Bluetooth control
   // Ensures single letter commands can be sent & received over Bluetooth
