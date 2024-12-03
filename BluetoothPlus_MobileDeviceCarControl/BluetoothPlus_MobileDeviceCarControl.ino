@@ -14,6 +14,8 @@
 // And built-in safety features:
   // Front-IR object detection -> stops if a wall is ahead
   // Night-time headlights -> toggles lights if the environment becomes dark
+  // Turning lights -> toggles side lights depending on which direction the car swirves to
+  // Flashing reverse hazardlights -> blinks lights when reversing
 
 // <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> // 
 
@@ -44,8 +46,8 @@ uint8_t RemoteXY_CONF[] =   // 117 bytes
 struct {
 
     // input variables
-  int8_t Direct_joystick_x; // from -100 to 100
-  int8_t Direct_joystick_y; // from -100 to 100
+  int8_t Direct_joystick_X; // from -100 to 100
+  int8_t Direct_joystick_Y; // from -100 to 100
   int8_t Speed_slider; // from 0 to 100
   uint8_t Emergency_stop; // =1 if button pressed, else =0
 
@@ -64,8 +66,8 @@ Servo servo_motor; // Create servo obj
 // ======= GLOBAL VARIABLES ========= //
 
 // Head & trail lights
-const int Rightlights_pin = A4;
-const int Leftlights_pin = A5;
+const int Rightlights_pin = A5;
+const int Leftlights_pin = A4;
 
 // Wheel control pins
 const int EN1 = 2; // Enable pin 1 (Digital)
@@ -92,18 +94,21 @@ const int IRSenseRight_pin = A2;
 
 // CONSTANTS ~~~~~~~~~~~~~~~~~~~~~~~~
 // Constant values
-const int LeftWheelTune = 29; // Offset value to approximate L-wheel power = R-wheel power
-const int Nighttime_Threshold = 300; // Sets photosensor threshold for lights to turn on
+const int LeftWheelTune = 0; // Offset value to approximate L-wheel power = R-wheel power, recommended value = 29
+const int Nighttime_Threshold = 400; // Sets photosensor threshold for lights to turn on
+const int Move_Threshold = 40; // Sets movement threshold before car is allowed to moved (solves "donut" behavior)
+const int TurnMaxRatio = 40; // Sets max offset value to allow for turning
+const int Blink_Threshold = 20; // Sets min value for X joystick value for turning side light(s) on
 
 // Tracking values
 int Speed_scalar = 0; // Tracks value of speed slider, 0 to 100
 
-bool Nighttime = false; // Tracks if dark or not
+bool Nighttime = false; // Tracks if ambient area is dark
 byte Move_direction = 1; // Tracks forward/backward movement; 1 forward VS 0 backward
 bool Hazard_Stopped = false; // Tracks for hazard stopping; uses IR sensors
-bool Emergency_Stopped = false; // Tracks emergency stopping
-bool Flashing_Counter = 0; // Counts loop iterations for light flashing effect
-bool Flashing_Threshold = 300; // Threshold to toggle lights to opposite state
+bool Emergency_Stopped = false; // Tracks emergency stopping; uses GUI button
+int Flashing_Counter = 0; // Counts loop iterations for light flashing effect
+int Flashing_Threshold = 2000; // Threshold to toggle lights to opposite state
 
 // ================================== //
 
@@ -152,9 +157,10 @@ void loop()
   DirectionConverter(); // Get joystick directions & write values to DC motor wheels
   FrontHazardCheck(); // Check for walls in front of car
   AmbientLightCheck(); // Checks brightness of room to toggle nighttime lights if needed
+  BlinkerLightsCheck(); // Check for turning lights
 
   // If reversing, flash lights via counter (on-off sequence)
-  if (Move_direction = 0){
+  if (Move_direction == 0){
     Flashing_Counter ++; // Add 1 to counter
     if (Flashing_Counter > 2*Flashing_Threshold){ // If above 2*threshold, set lights to on and reset counter
       analogWrite(Rightlights_pin,255);
@@ -165,7 +171,7 @@ void loop()
       analogWrite(Rightlights_pin,0);
       analogWrite(Leftlights_pin,0);
     }
-    else if(){ // If below threshold, set lights to on
+    else{ // If below threshold, set lights to on
       analogWrite(Rightlights_pin,255);
       analogWrite(Leftlights_pin,255);
     }
@@ -175,7 +181,7 @@ void loop()
     Flashing_Counter = 0; // Not in reverse direction, set counter to 0
   }
 
-  // Check for emergency stopping
+  // Check for emergency stopping (GUI button)
   if (RemoteXY.Emergency_stop == 1){
     Emergency_Stopped = true; // Button is held down
     // Turn on all lights
@@ -201,13 +207,13 @@ void DirectionConverter(){
   // Check for if emergency stop button is not held down
   if (Emergency_Stopped == false){
     // Forward or backward check (Y direction)
-    if (RemoteXY.Direct_joystick_y > 0 and Hazard_Stopped == false){ // Forwards & no hazard stopping
+    if (RemoteXY.Direct_joystick_Y > Move_Threshold and Hazard_Stopped == false){ // Forwards & no hazard stopping
       Move_direction = 1;
-      MoveForwards(abs(RemoteXY.Direct_joystick_X),abs(RemoteXY.Direct_joystick_Y)); // Move backwards
+      MoveForwards(RemoteXY.Direct_joystick_X,abs(RemoteXY.Direct_joystick_Y)); // Move backwards (send absolute val of Y position)
     }
-    else if (RemoteXY.Direct_joystick_y < 0){ // Backwards
+    else if (RemoteXY.Direct_joystick_Y < -Move_Threshold){ // Backwards
       Move_direction = 0;
-      MoveBackwards(abs(RemoteXY.Direct_joystick_X),abs(RemoteXY.Direct_joystick_Y)); // Move forwards
+      MoveBackwards(RemoteXY.Direct_joystick_X,abs(RemoteXY.Direct_joystick_Y)); // Move forwards (send absolute val of Y position)
     }
     else { // Stopped, y = 0
       Stop();
@@ -238,36 +244,58 @@ void AmbientLightCheck(){
   }
 }
 
-// Checks for front hazards with IR sensors
+// Check turning lights for toggling
+void BlinkerLightsCheck(){
+  // Compare joystick's X value against threshold turning val (must be greater than constant to toggle turning lights)
+  if (RemoteXY.Direct_joystick_X<-Blink_Threshold){ // Turn left lights on
+    analogWrite(Leftlights_pin,255);
+    analogWrite(Rightlights_pin,0);
+  }
+  else if (RemoteXY.Direct_joystick_X > Blink_Threshold){ // Turn right lights on
+    analogWrite(Leftlights_pin,0);
+    analogWrite(Rightlights_pin,255);
+  }
+  else{ // Not enough X value, turn off lights
+    analogWrite(Leftlights_pin,0);
+    analogWrite(Rightlights_pin,0);
+  }
+}
+
+// Checks for wide-front hazards with IR sensors
 void FrontHazardCheck(){
+  // Check if either IR sensor is LOW (detects obstacle) and car is moving forward; ignore if moving backwards
   if ((digitalRead(IRSenseLeft_pin) == LOW or digitalRead(IRSenseRight_pin) == 0) and Move_direction == 1) {
     Stop();
     Hazard_Stopped = true; // Set hazard stop to true, stop any forward movement
     analogWrite(Leftlights_pin,255);
+    analogWrite(Rightlights_pin,255);
   }
   else{
-    Hazard_Stopped = false; // Reset hazard stop to false
+    Hazard_Stopped = false; // Reset hazard stop to false, re-allow forward movement
     analogWrite(Leftlights_pin,0);
+    analogWrite(Rightlights_pin,0);
   }
 }
 
 // Wheel functions ~~~~~~~~~~~~~~~~~~~~~~~~~
 // Move forward
-void MoveForwards(int LeftSpeed, int RightSpeed) {
+void MoveForwards(int TurnRatio, int Speed) {
+  int MapTurnRatio = map(TurnRatio,-100,100,-TurnMaxRatio,TurnMaxRatio); // Scale turning value (-100 to 100) to allowed ratio
   digitalWrite(EN1, HIGH);
   digitalWrite(EN2, LOW);
-  // Write corresponding x-joystick speeds to each wheel; scale by "Speed_slider" as a percentage
-  analogWrite(MC1, (LeftSpeed-LeftWheelTune)*(RemoteXY.Speed_slider/100)); // Tuning left wheel
-  analogWrite(MC2, RightSpeed*(RemoteXY.Speed_slider/100));
+  // Write corresponding x-joystick speeds to each wheel; scale by "Speed_slider" via mappingscale by 2*"Speed_slider" via mapping
+  analogWrite(MC1, map(Speed+MapTurnRatio-LeftWheelTune,0,140,0,2*RemoteXY.Speed_slider));
+  analogWrite(MC2, map(Speed-MapTurnRatio,0,140,0,2*RemoteXY.Speed_slider));
 }
 
 // Move backwards
-void MoveBackwards(int LeftSpeed, int RightSpeed) {
+void MoveBackwards(int TurnRatio, int Speed) {
+  int MapTurnRatio = map(TurnRatio,-100,100,-TurnMaxRatio,TurnMaxRatio); // Scale turning value (-100 to 100) to allowed ratio
   digitalWrite(EN1, LOW);
   digitalWrite(EN2, HIGH);
-  // Write corresponding x-joystick speeds to each wheel; scale by "Speed_slider" as a percentage
-  analogWrite(MC1, (LeftSpeed-LeftWheelTune)*(RemoteXY.Speed_slider/100)); // Tuning left wheel
-  analogWrite(MC2, RightSpeed*(RemoteXY.Speed_slider/100));
+  // Write corresponding x-joystick speeds to each wheel;scale by "Speed_slider" via mappingscale by 2*"Speed_slider" via mapping
+  analogWrite(MC1, map(Speed+MapTurnRatio-LeftWheelTune,0,140,0,2*RemoteXY.Speed_slider));
+  analogWrite(MC2, map(Speed-MapTurnRatio,0,140,0,2*RemoteXY.Speed_slider));
 }
 
 // Stop movement
