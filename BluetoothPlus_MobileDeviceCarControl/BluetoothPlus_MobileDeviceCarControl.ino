@@ -229,7 +229,7 @@ void AmbientLightCheck(){
   // Check for forward movement only
   if (Move_direction == 1){
     // Check for analog value above threshold (large value -> dark)
-    if (analogRead(A0)> Nighttime_Threshold or analogRead(A3) > Nighttime_Threshold){
+    if (analogRead(PhotoResistorLeft_pin)> Nighttime_Threshold or analogRead(PhotoResistorRight_pin) > Nighttime_Threshold){
       // Above threshold, turn ON lights
       Nighttime = true;
       analogWrite(Rightlights_pin,255);
@@ -283,7 +283,7 @@ void MoveForwards(int TurnRatio, int Speed) {
   int MapTurnRatio = map(TurnRatio,-100,100,-TurnMaxRatio,TurnMaxRatio); // Scale turning value (-100 to 100) to allowed ratio
   digitalWrite(EN1, HIGH);
   digitalWrite(EN2, LOW);
-  // Write corresponding x-joystick speeds to each wheel; scale by "Speed_slider" via mappingscale by 2*"Speed_slider" via mapping
+  // Write corresponding x-joystick speeds to each wheel; scale by "Speed_slider" via mappingscale by 2*"Speed_slider" with map()
   analogWrite(MC1, map(Speed+MapTurnRatio-LeftWheelTune,0,140,0,2*RemoteXY.Speed_slider));
   analogWrite(MC2, map(Speed-MapTurnRatio,0,140,0,2*RemoteXY.Speed_slider));
 }
@@ -293,7 +293,7 @@ void MoveBackwards(int TurnRatio, int Speed) {
   int MapTurnRatio = map(TurnRatio,-100,100,-TurnMaxRatio,TurnMaxRatio); // Scale turning value (-100 to 100) to allowed ratio
   digitalWrite(EN1, LOW);
   digitalWrite(EN2, HIGH);
-  // Write corresponding x-joystick speeds to each wheel;scale by "Speed_slider" via mappingscale by 2*"Speed_slider" via mapping
+  // Write corresponding x-joystick speeds to each wheel;scale by "Speed_slider" via mappingscale by 2*"Speed_slider" with map()
   analogWrite(MC1, map(Speed+MapTurnRatio-LeftWheelTune,0,140,0,2*RemoteXY.Speed_slider));
   analogWrite(MC2, map(Speed-MapTurnRatio,0,140,0,2*RemoteXY.Speed_slider));
 }
