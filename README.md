@@ -8,7 +8,7 @@ Main Hardware: This uses the "LAFVIN Smart Robot Car 2WD Chassis Kit"; it utiliz
 Available here: https://lafvintech.com/products/lafvin-smart-robot-car-2wd-chassis-kit-upgraded-v2-0-for-arduino-robot-stem-graphical-programming-robot-car
 
 Contains:
- - Main "Bluetooth+ Remote Controller" program
+ - Main "Bluetooth+ Remote Controller" program; download the "BluetoothPlus_MobileDeviceCarControl" folder for the code/program
   - Changable user values to tune the car to your heart's content
  - Examples to test fundamental functions
  - Images & diagrams
